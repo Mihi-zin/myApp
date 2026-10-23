@@ -39,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen> {
         ),
         child: const Center(
           child: Text(
-            'Tech Trader',
+            'Talent Bridge',
             style: TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.bold,

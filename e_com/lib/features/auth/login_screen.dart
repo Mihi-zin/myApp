@@ -17,7 +17,7 @@ class _SignUpScreenState extends State<SignUpScreen>
   final AuthService _authService = AuthService();
 
   // Controllers
-  final TextEditingController _nameController = TextEditingController(); // Handles Name / Company Name
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();

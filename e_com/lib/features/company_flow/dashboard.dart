@@ -10,7 +10,8 @@ class CompanyDashboardScreen extends StatefulWidget {
 }
 
 class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
-  int _selectedTab = 0; // 0 = Profiles, 1 = Other Companies
+  final User? currentUser = FirebaseAuth.instance.currentUser;
+  int _selectedTab = 0; // 0 = Profiles (Interns), 1 = Other Companies
   int _currentIndex = 0;
   String companyName = "Company";
 
@@ -22,12 +23,11 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
 
   // Safely fetch company name without blocking screen rendering
   Future<void> _fetchCompanyData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
+    if (currentUser != null) {
       try {
         DocumentSnapshot doc = await FirebaseFirestore.instance
             .collection('users')
-            .doc(user.uid)
+            .doc(currentUser!.uid)
             .get()
             .timeout(const Duration(seconds: 4));
 
@@ -41,16 +41,6 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
       }
     }
   }
-
-  // Mock data using reliable icons/colors instead of external image URLs
-  final List<Map<String, dynamic>> _profiles = [
-    {'name': 'Suma', 'color': const Color(0xFF8E7C81), 'icon': Icons.person},
-    {'name': 'Fidae', 'color': const Color(0xFF8BB1A8), 'icon': Icons.person_3},
-    {'name': 'Emma', 'color': const Color(0xFF6B725B), 'icon': Icons.person_2},
-    {'name': 'Nounou', 'color': const Color(0xFF9E9296), 'icon': Icons.person_4},
-    {'name': 'Blazuu', 'color': const Color(0xFF4A4E51), 'icon': Icons.person},
-    {'name': 'Feire', 'color': const Color(0xFFD98852), 'icon': Icons.person_2},
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -125,25 +115,9 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
 
               const SizedBox(height: 20),
 
-              // 3. Grid List of Intern Profiles
+              // 3. Dynamic Grid Content based on Selected Tab
               Expanded(
-                child: GridView.builder(
-                  itemCount: _profiles.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 0.72,
-                  ),
-                  itemBuilder: (context, index) {
-                    final profile = _profiles[index];
-                    return _buildProfileCard(
-                      name: profile['name'],
-                      bgColor: profile['color'],
-                      icon: profile['icon'],
-                    );
-                  },
-                ),
+                child: _selectedTab == 0 ? _buildInternsGrid() : _buildCompaniesGrid(),
               ),
             ],
           ),
@@ -173,6 +147,129 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // --- Stream for Interns (Tab 0) ---
+  Widget _buildInternsGrid() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'intern')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Text(
+              'No interns registered yet.',
+              style: TextStyle(fontSize: 15, color: Colors.grey, fontWeight: FontWeight.w500),
+            ),
+          );
+        }
+
+        final interns = snapshot.data!.docs;
+        final colors = [
+          const Color(0xFF8E7C81),
+          const Color(0xFF8BB1A8),
+          const Color(0xFF6B725B),
+          const Color(0xFF9E9296),
+        ];
+
+        return GridView.builder(
+          physics: const BouncingScrollPhysics(),
+          itemCount: interns.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 0.72,
+          ),
+          itemBuilder: (context, index) {
+            final data = interns[index].data() as Map<String, dynamic>;
+            final name = data['name'] ?? 'Intern';
+            final bgColor = colors[index % colors.length];
+
+            return _buildProfileCard(
+              name: name,
+              bgColor: bgColor,
+              icon: Icons.person,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- Stream for Other Companies (Tab 1) ---
+  Widget _buildCompaniesGrid() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'company')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Text(
+              'No other companies registered yet.',
+              style: TextStyle(fontSize: 15, color: Colors.grey, fontWeight: FontWeight.w500),
+            ),
+          );
+        }
+
+        // Filter out the currently logged-in company from the list
+        final companies = snapshot.data!.docs
+            .where((doc) => doc.id != currentUser?.uid)
+            .toList();
+
+        if (companies.isEmpty) {
+          return const Center(
+            child: Text(
+              'No other companies found.',
+              style: TextStyle(fontSize: 15, color: Colors.grey, fontWeight: FontWeight.w500),
+            ),
+          );
+        }
+
+        final colors = [
+          const Color(0xFF71829D),
+          const Color(0xFFC84B4B),
+          const Color(0xFF8BB1A8),
+          const Color(0xFF53565A),
+        ];
+
+        return GridView.builder(
+          physics: const BouncingScrollPhysics(),
+          itemCount: companies.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 0.72,
+          ),
+          itemBuilder: (context, index) {
+            final data = companies[index].data() as Map<String, dynamic>;
+            final name = data['name'] ?? 'Company';
+            final handle = data['companyHandle'] ?? '@company';
+            final bgColor = colors[index % colors.length];
+
+            return _buildProfileCard(
+              name: name,
+              subtitle: handle,
+              bgColor: bgColor,
+              icon: Icons.business,
+            );
+          },
+        );
+      },
     );
   }
 
@@ -211,9 +308,10 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
     );
   }
 
-  // Card Builder
+  // Card Builder (Supports both intern profiles and other companies)
   Widget _buildProfileCard({
     required String name,
+    String? subtitle,
     required Color bgColor,
     required IconData icon,
   }) {
@@ -234,21 +332,36 @@ class _CompanyDashboardScreenState extends State<CompanyDashboardScreen> {
               child: Icon(icon, size: 36, color: Colors.white),
             ),
 
-            // Name Pill
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+            // Name / Handle Pill
+            Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
                 ),
-              ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
             ),
 
             // Button
